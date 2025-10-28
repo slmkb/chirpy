@@ -201,3 +201,71 @@ func (cfg *apiConfig) handlerRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (cfg *apiConfig) handlerUpdateUserPassword(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("update user password handler: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("update user password: %v", err)
+		internalError(w)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		log.Printf("update user password: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	passwordHash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		log.Printf("update user password: %v", err)
+		internalError(w)
+		return
+	}
+
+	user, err := cfg.db.UpdateUser(context.Background(), database.UpdateUserParams{
+		ID:           userID,
+		Email:        req.Email,
+		PasswordHash: passwordHash,
+	})
+
+	if err != nil {
+		log.Printf("update user password: %v", err)
+		internalError(w)
+		return
+	}
+
+	dat, err := json.Marshal(struct {
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Email     string    `json:"email"`
+	}{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Email:     user.Email,
+	})
+
+	if err != nil {
+		log.Printf("create user: %v", err)
+		internalError(w)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(dat)
+}

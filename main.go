@@ -63,6 +63,8 @@ func main() {
 	mux.Handle("POST /admin/reset", http.HandlerFunc(cfg.reset))
 	mux.Handle("POST /api/refresh", http.HandlerFunc(cfg.handlerRefresh))
 	mux.Handle("POST /api/revoke", http.HandlerFunc(cfg.handlerRevoke))
+	mux.Handle("PUT /api/users", http.HandlerFunc(cfg.handlerUpdateUserPassword))
+	mux.Handle("DELETE /api/chirps/{id}", http.HandlerFunc(cfg.handlerDeleteChirp))
 
 	log.Printf("Staring server on port %s", port)
 	if err := srv.ListenAndServe(); err != nil {

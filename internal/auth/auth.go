@@ -51,12 +51,19 @@ func ValidateJWT(tokenString string, tokenSecret []byte) (uuid.UUID, error) {
 
 func GetBearerToken(headers http.Header) (string, error) {
 	authHeader := headers.Get("Authorization")
-	fields := strings.Split(authHeader, ",")
-	for _, field := range fields {
-		keyValue := strings.Fields(field)
-		if keyValue[0] == "Bearer" {
-			return keyValue[1], nil
-		}
+	if authHeader == "" {
+		return "", fmt.Errorf("bearer token not found")
 	}
-	return "", fmt.Errorf("bearer token not found")
+
+	if !strings.HasPrefix(authHeader, "Bearer") {
+		return "", fmt.Errorf("bearer token not found")
+	}
+
+	token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer"))
+	if token == "" {
+		return "", fmt.Errorf("bearer token not found")
+	}
+
+	return token, nil
+
 }

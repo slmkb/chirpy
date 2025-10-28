@@ -65,7 +65,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		}
 		dat, err := json.Marshal(respBody)
 		if err != nil {
-			log.Printf("1validate chrip: %v", err)
+			log.Printf("validate chrip: %v", err)
 			internalError(w)
 			return
 		}
@@ -84,7 +84,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		UserID: userID,
 	})
 	if err != nil {
-		log.Printf("2validate chrip: %v %+v", err, params)
+		log.Printf("validate chrip: %v %+v", err, params)
 		internalError(w)
 		return
 	}
@@ -95,7 +95,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	respBody.UserID = chirp.UserID
 	dat, err := json.Marshal(respBody)
 	if err != nil {
-		log.Printf("3validate chrip: %v", err)
+		log.Printf("validate chrip: %v", err)
 		internalError(w)
 		return
 	}
@@ -143,7 +143,7 @@ func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request
 	}
 	dat, err := json.Marshal(respBody)
 	if err != nil {
-		log.Printf("4validate chrip: %v", err)
+		log.Printf("validate chrip: %v", err)
 		internalError(w)
 		return
 	}
@@ -156,7 +156,7 @@ func (cfg *apiConfig) handlerGetChirpByID(w http.ResponseWriter, r *http.Request
 	id := r.PathValue("id")
 	parsedId, err := uuid.Parse(id)
 	if err != nil {
-		log.Printf("5validate chrip: %v", err)
+		log.Printf("validate chrip: %v", err)
 		internalError(w)
 		return
 	}
@@ -166,7 +166,7 @@ func (cfg *apiConfig) handlerGetChirpByID(w http.ResponseWriter, r *http.Request
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
-		log.Printf("6validate chrip: %v", err)
+		log.Printf("validate chrip: %v", err)
 		internalError(w)
 		return
 	}
@@ -178,11 +178,62 @@ func (cfg *apiConfig) handlerGetChirpByID(w http.ResponseWriter, r *http.Request
 	respBody.UserID = chirp.UserID
 	dat, err := json.Marshal(respBody)
 	if err != nil {
-		log.Printf("7validate chrip: %v", err)
+		log.Printf("validate chrip: %v", err)
 		internalError(w)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(dat)
+}
+
+func (cfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	parsedId, err := uuid.Parse(id)
+	if err != nil {
+		log.Printf("validate chrip: %v", err)
+		internalError(w)
+		return
+	}
+	chirp, err := cfg.db.GetChirpByID(context.Background(), parsedId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
+		log.Printf("validate chrip: %v", err)
+		internalError(w)
+		return
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("delete chrip: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		log.Printf("delete chrip: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if userID != chirp.UserID {
+		log.Printf("delete chrip: %v", err)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	err = cfg.db.DeleteChirp(context.Background(), database.DeleteChirpParams{
+		UserID: userID,
+		ID:     chirp.ID,
+	})
+	if err != nil {
+		log.Printf("delete chrip: %v", err)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

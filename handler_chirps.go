@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -124,11 +125,39 @@ func filterChrip(text string) string {
 }
 
 func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request) {
-	chirps, err := cfg.db.GetAllChirps(context.Background())
-	if err != nil {
-		log.Printf("GetAllChirps: %v", err)
-		internalError(w)
-		return
+	var chirps []database.Chirp
+	var err error
+
+	if author := r.URL.Query().Get("author_id"); author == "" {
+		chirps, err = cfg.db.GetAllChirps(context.Background())
+		if err != nil {
+			log.Printf("GetChirpsByUser: %v", err)
+			internalError(w)
+			return
+		}
+	} else {
+		authorUUID, err := uuid.Parse(author)
+		if err != nil {
+			log.Printf("GetChirpsByUser: %v", err)
+			internalError(w)
+			return
+		}
+		chirps, err = cfg.db.GetChirpsByUserID(context.Background(), authorUUID)
+		if err != nil {
+			log.Printf("GetChirpsByUser: %v", err)
+			internalError(w)
+			return
+		}
+	}
+
+	if order := r.URL.Query().Get("sort"); order == "asc" {
+		sort.Slice(chirps, func(i, j int) bool {
+			return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+		})
+	} else if order == "desc" {
+		sort.Slice(chirps, func(i, j int) bool {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		})
 	}
 
 	var respBody []returnVals

@@ -23,6 +23,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	jwtSecret      []byte
+	polkaAPIKey    string
 }
 
 func main() {
@@ -50,6 +51,7 @@ func main() {
 		fileserverHits: atomic.Int32{},
 		db:             dbQueries,
 		jwtSecret:      jwtSecret,
+		polkaAPIKey:    os.Getenv("POLKA_API_KEY"),
 	}
 
 	mux.Handle("/app/", cfg.middlewareMetricInc(http.StripPrefix("/app", http.FileServer(http.Dir(fileDir)))))
@@ -65,6 +67,7 @@ func main() {
 	mux.Handle("POST /api/revoke", http.HandlerFunc(cfg.handlerRevoke))
 	mux.Handle("PUT /api/users", http.HandlerFunc(cfg.handlerUpdateUserPassword))
 	mux.Handle("DELETE /api/chirps/{id}", http.HandlerFunc(cfg.handlerDeleteChirp))
+	mux.Handle("POST /api/polka/webhooks", http.HandlerFunc(cfg.handlerUpgradeUser))
 
 	log.Printf("Staring server on port %s", port)
 	if err := srv.ListenAndServe(); err != nil {

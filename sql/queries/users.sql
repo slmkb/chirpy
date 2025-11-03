@@ -19,5 +19,11 @@ SET email = $2, password_hash = $3, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 
+-- name: UpgradeUser :one
+UPDATE users
+SET is_chirpy_red = TRUE
+WHERE id = $1
+RETURNING id;
+
 -- name: DropUsers :exec
 DELETE FROM users;

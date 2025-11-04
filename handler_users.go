@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -156,13 +157,24 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 
 	q, err := cfg.db.GetRefreshToken(context.Background(), refreshToken)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		log.Printf("refresh handler: %v", err)
 		internalError(w)
 		return
 	}
 
+	if time.Now().After(q.ExpiresAt) {
+		log.Printf("refresh handler: refresh token expired")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	if q.RevokedAt.Valid {
-		log.Printf("refresh token revoked: %v", err)
+		log.Printf("refresh handler: refresh token revoked")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
